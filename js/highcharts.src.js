@@ -1,4 +1,16 @@
-// ==ClosureCompiler==
+//lines 1410 - 1413: Modification of default select state of column charts to value equal to hover state , to help prevent points from turning gray upon select
+//lines 9544 & 9545: Addition of variables stateOptionsSelect (with value = stateOptions[SELECT_STATE), and pointStateOptionsSelect (no value), to help prevent points from turning gray upon select
+//lines 9574 - 9576 & 9631-9634 (not exactly the same): Addition of code that creates a default select color for bar, column, and pie charts if one is not given
+//line 9622:  Addition which allows select state appearance options for a point to override those set for its series
+//lines 5119 & 5123: Modification of allowed intervals of day (3,4,5,6) and week (3) to prevent labels from overlapping each other as a result of small tick intervals covering large differences between extremes
+//line 5797: Modification to make axis line dissapear when lineWidth is set to 0 and chart is redrawn
+//line 6015: Modifications to allow for dynamic addition of toolbar buttons
+//lines 6053, 6058 & 6064: Modification to allow for retrieval of toolbar button elements for dynamic manipulation
+//lines 6301: Modification of tooltip box width to use css width value of html tooltip in place of bBox.width
+//lines 8772 - 8773 & 10652: Modifications to allow for the retention of custom borderWidths for column points on zoom
+
+
+// // ==ClosureCompiler==
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
@@ -1396,8 +1408,7 @@ defaultPlotOptions.column = merge(defaultSeriesOptions, {
 			shadow: false
 		},
 		select: {
-			color: '#C0C0C0',
-			borderColor: '#000000',
+                        brightness: 0.1,
 			shadow: false
 		}
 	},
@@ -5105,11 +5116,11 @@ function Chart(options, callback) {
 				], [
 					'day',							// unit name
 					oneDay,							// fixed incremental unit
-					[1, 2]							// allowed multiples
+					[1, 2, 3, 4, 5, 6]					// allowed multiples
 				], [
 					'week',							// unit name
 					oneWeek,						// fixed incremental unit
-					[1, 2]							// allowed multiples
+					[1, 2, 3]						// allowed multiples
 				], [
 					'month',
 					oneMonth,
@@ -5754,39 +5765,40 @@ function Chart(options, callback) {
 			// Static items. As the axis group is cleared on subsequent calls
 			// to render, these items are added outside the group.
 			// axis line
-			if (lineWidth) {
-				lineLeft = plotLeft + (opposite ? plotWidth : 0) + offset;
-				lineTop = chartHeight - marginBottom - (opposite ? plotHeight : 0) + offset;
 
-				linePath = renderer.crispLine([
-						M,
-						horiz ?
-							plotLeft :
-							lineLeft,
-						horiz ?
-							lineTop :
-							plotTop,
-						L,
-						horiz ?
-							chartWidth - marginRight :
-							lineLeft,
-						horiz ?
-							lineTop :
-							chartHeight - marginBottom
-					], lineWidth);
-				if (!axisLine) {
-					axisLine = renderer.path(linePath)
-						.attr({
-							stroke: options.lineColor,
-							'stroke-width': lineWidth,
-							zIndex: 7
-						})
-						.add();
-				} else {
-					axisLine.animate({ d: linePath });
-				}
+                        lineLeft = plotLeft + (opposite ? plotWidth : 0) + offset;
+                        lineTop = chartHeight - marginBottom - (opposite ? plotHeight : 0) + offset;
 
-			}
+                        linePath = renderer.crispLine([
+                                        M,
+                                        horiz ?
+                                                plotLeft :
+                                                lineLeft,
+                                        horiz ?
+                                                lineTop :
+                                                plotTop,
+                                        L,
+                                        horiz ?
+                                                chartWidth - marginRight :
+                                                lineLeft,
+                                        horiz ?
+                                                lineTop :
+                                                chartHeight - marginBottom
+                                ], lineWidth);
+                        if (!axisLine) {
+                                axisLine = renderer.path(linePath)
+                                        .attr({
+                                                stroke: options.lineColor,
+                                                'stroke-width': lineWidth,
+                                                zIndex: 7
+                                        })
+                                        .add();
+                        } else {
+                                axisLine.attr({'stroke-width': lineWidth});
+                                axisLine.animate({ d: linePath });
+                        }
+
+			
 
 			if (axisTitle) {
 				// compute anchor points for each of the title align options
@@ -6001,6 +6013,16 @@ function Chart(options, callback) {
 
 		/*jslint unparam: true*//* allow the unused param title until Toolbar rewrite*/
 		function add(id, text, title, fn) {
+                        var elementXValuesNegativeSum = 0;
+
+			$.each(buttons, function(key, element)
+			{
+			   elementXValuesNegativeSum = elementXValuesNegativeSum - 20 - element.getBBox().width;
+
+			});
+
+			var horizontalDisplacement = elementXValuesNegativeSum - 20; // "20" is an arbitrary number that you can feel free to modify
+
 			if (!buttons[id]) {
 				var button = renderer.text(
 					text,
@@ -6010,7 +6032,7 @@ function Chart(options, callback) {
 				.css(options.toolbar.itemStyle)
 				.align({
 					align: 'right',
-					x: -marginRight - 20,
+					x: horizontalDisplacement,
 					y: plotTop + 30
 				})
 				.on('click', fn)
@@ -6030,13 +6052,19 @@ function Chart(options, callback) {
 
 		function remove(id) {
 			discardElement(buttons[id].element);
-			buttons[id] = null;
+			delete buttons[id];
+		}
+
+		function getButton(id)
+		{
+			return buttons[id];
 		}
 
 		// public
 		return {
 			add: add,
-			remove: remove
+			remove: remove,
+			getButton: getButton
 		};
 	}
 
@@ -6269,7 +6297,7 @@ function Chart(options, callback) {
 
 				// get the bounding box
 				bBox = label.getBBox();
-				boxWidth = bBox.width + 2 * padding;
+				boxWidth = 235 + 2 * padding;
 				boxHeight = bBox.height + 2 * padding;
 
 				// set the size of the box
@@ -8740,6 +8768,9 @@ Point.prototype = {
 				series.getAttribs();
 				if (graphic) {
 					graphic.attr(point.pointAttr[series.state]);
+
+                                        if(options.hasOwnProperty("borderWidth"))
+                                                graphic.strokeWidth = point.shapeArgs.strokeWidth = options.borderWidth;
 				}
 			}
 
@@ -9448,9 +9479,10 @@ Series.prototype = {
 
 					// shortcuts
 					pointAttr = point.pointAttr[point.selected ? SELECT_STATE : NORMAL_STATE];
-					radius = pointAttr.r;
+					radius = pointAttr.r;         
 
 					if (graphic) { // update
+                                                
 						graphic.animate({
 							x: plotX,
 							y: plotY,
@@ -9510,6 +9542,8 @@ Series.prototype = {
 			stateOptions = normalOptions.states,
 			stateOptionsHover = stateOptions[HOVER_STATE],
 			pointStateOptionsHover,
+                        stateOptionsSelect = stateOptions[SELECT_STATE],
+			pointStateOptionsSelect,
 			seriesColor = series.color,
 			normalDefaults = {
 				stroke: seriesColor,
@@ -9537,6 +9571,10 @@ Series.prototype = {
 			stateOptionsHover.color = stateOptionsHover.color ||
 				Color(stateOptionsHover.color || seriesColor)
 					.brighten(stateOptionsHover.brightness).get();
+
+                         stateOptionsSelect.color = stateOptionsSelect.color ||
+				Color(stateOptionsSelect.color || seriesColor)
+					.brighten(stateOptionsSelect.brightness).get();
 		}
 
 		// general point attributes for the series normal state
@@ -9582,6 +9620,7 @@ Series.prototype = {
 				pointAttr = [];
 				stateOptions = normalOptions.states || {}; // reassign for individual point
 				pointStateOptionsHover = stateOptions[HOVER_STATE] = stateOptions[HOVER_STATE] || {};
+                                pointStateOptionsSelect = stateOptions[SELECT_STATE] = stateOptions[SELECT_STATE] || {};
 
 				// if no hover color is given, brighten the normal color
 				if (!series.options.marker) { // column, bar, point
@@ -9589,6 +9628,11 @@ Series.prototype = {
 						Color(pointStateOptionsHover.color || point.options.color)
 							.brighten(pointStateOptionsHover.brightness ||
 								stateOptionsHover.brightness).get();
+
+                                         pointStateOptionsSelect.color =
+						Color(pointStateOptionsSelect.color || point.options.color)
+							.brighten(pointStateOptionsSelect.brightness ||
+								stateOptionsSelect.brightness).get();
 
 				}
 
@@ -10602,7 +10646,10 @@ var ColumnSeries = extendClass(Series, {
 			if (plotY !== UNDEFINED && !isNaN(plotY) && point.y !== null) {
 				graphic = point.graphic;
 				shapeArgs = point.shapeArgs;
+                                
 				if (graphic) { // update
+                                        if(shapeArgs.hasOwnProperty("strokeWidth")) shapeArgs.strokeWidth = point.options.strokeWidth;
+                                    
 					stop(graphic);
 					graphic.animate(shapeArgs);
 
